@@ -1,0 +1,49 @@
+# Environment & Secrets
+.env
+*.env
+*.key
+
+# Python
+venv/
+.venv/
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+
+# Flutter & Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+build/
+app/build/
+app/.dart_tool/
+app/.flutter-plugins
+app/.flutter-plugins-dependencies
+app/.packages
+app/.pub-cache/
+app/.pub/
+
+# Android Studio / Gradle
+.gradle/
+app/android/.gradle/
+app/android/local.properties
+app/android/app/build/
+**/android/.gradle/
+**/android/local.properties
+*.iml
+*.ipr
+*.iws
+.idea/
+
+# OS / Editor
+.DS_Store
+Thumbs.db
+*.swp
+*.bak
+*~
+.vscode/
