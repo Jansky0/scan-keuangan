@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:image_cropper/image_cropper.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
@@ -47,6 +48,9 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isScanning = false;
   DateTime _selectedMonth = DateTime(DateTime.now().year, DateTime.now().month);
   String? _userName;
+  String _searchQuery = '';
+  String _selectedFilterFlow = 'ALL';
+  final TextEditingController _searchController = TextEditingController();
 
   final currencyFormatter = NumberFormat.currency(
     locale: 'id_ID',
@@ -102,6 +106,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void dispose() {
     _intentSub.cancel();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -246,6 +251,20 @@ class _HomeScreenState extends State<HomeScreen> {
                 onTap: () {
                   Navigator.pop(ctx);
                   _pickImage(ImageSource.camera);
+                },
+              ),
+              const Divider(height: 12),
+              ListTile(
+                leading: CircleAvatar(
+                  backgroundColor: Colors.amber.shade50,
+                  child: const Icon(Icons.edit_note, color: Color(0xFFB45309)),
+                ),
+                title: const Text('Catat Manual (Tunai / Kasir)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                subtitle: const Text('Catat transaksi tunai/kas tanpa bukti struk fisik', style: TextStyle(fontSize: 12)),
+                trailing: const Icon(Icons.chevron_right, size: 20),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _showManualInputDialog();
                 },
               ),
             ],
@@ -743,6 +762,589 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  // Modal Input Transaksi Manual (Kas / Tunai)
+  void _showManualInputDialog() {
+    String flowType = 'PENGELUARAN';
+    String category = 'Makanan & Minuman';
+    String platform = 'Tunai / Cash';
+    DateTime selectedDate = DateTime.now();
+
+    final nominalController = TextEditingController();
+    final descController = TextEditingController();
+
+    final categories = [
+      'Makanan & Minuman',
+      'Belanja',
+      'Transportasi',
+      'Tagihan & Utilitas',
+      'Transfer / Patungan',
+      'Hiburan',
+      'Gaji / Pendapatan',
+      'Lainnya',
+    ];
+
+    final platforms = [
+      'Tunai / Cash',
+      'BCA',
+      'Livin\' Mandiri',
+      'BRImo',
+      'BNI',
+      'DANA',
+      'GoPay',
+      'ShopeePay',
+      'QRIS',
+      'Lainnya',
+    ];
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (modalCtx, setModalState) {
+            final isIncome = flowType == 'PEMASUKAN';
+            return Container(
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+              ),
+              padding: EdgeInsets.only(
+                left: 20,
+                right: 20,
+                top: 20,
+                bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
+              ),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 44,
+                        height: 5,
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade300,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Catat Transaksi Manual',
+                      style: Theme.of(ctx).textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Selector Arus Keuangan: 🟢 PEMASUKAN vs 🔴 PENGELUARAN
+                    Row(
+                      children: [
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: () {
+                              setModalState(() {
+                                flowType = 'PEMASUKAN';
+                                if (category == 'Makanan & Minuman') {
+                                  category = 'Gaji / Pendapatan';
+                                }
+                              });
+                            },
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              decoration: BoxDecoration(
+                                color: isIncome ? Colors.green.shade600 : Colors.grey.shade100,
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(
+                                  color: isIncome ? Colors.green.shade700 : Colors.grey.shade300,
+                                  width: 1.5,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.arrow_downward,
+                                    size: 18,
+                                    color: isIncome ? Colors.white : Colors.grey.shade700,
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    'UANG MASUK',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 13,
+                                      color: isIncome ? Colors.white : Colors.grey.shade700,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: () {
+                              setModalState(() {
+                                flowType = 'PENGELUARAN';
+                                if (category == 'Gaji / Pendapatan') {
+                                  category = 'Makanan & Minuman';
+                                }
+                              });
+                            },
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              decoration: BoxDecoration(
+                                color: !isIncome ? Colors.red.shade600 : Colors.grey.shade100,
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(
+                                  color: !isIncome ? Colors.red.shade700 : Colors.grey.shade300,
+                                  width: 1.5,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.arrow_upward,
+                                    size: 18,
+                                    color: !isIncome ? Colors.white : Colors.grey.shade700,
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    'UANG KELUAR',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 13,
+                                      color: !isIncome ? Colors.white : Colors.grey.shade700,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Input Nominal
+                    TextField(
+                      controller: nominalController,
+                      keyboardType: TextInputType.number,
+                      autofocus: true,
+                      style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                      decoration: InputDecoration(
+                        prefixText: 'Rp ',
+                        labelText: 'Nominal Transaksi',
+                        hintText: '0',
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+                        filled: true,
+                        fillColor: Colors.grey.shade50,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Input Keterangan / Toko
+                    TextField(
+                      controller: descController,
+                      decoration: InputDecoration(
+                        labelText: 'Keterangan / Nama Toko',
+                        hintText: isIncome ? 'Contoh: Gaji, Bonus, dll' : 'Contoh: Warteg, Kopi, Bensin, dll',
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+                        filled: true,
+                        fillColor: Colors.grey.shade50,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Row: Kategori & Metode
+                    Row(
+                      children: [
+                        Expanded(
+                          child: DropdownButtonFormField<String>(
+                            initialValue: category,
+                            decoration: InputDecoration(
+                              labelText: 'Kategori',
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+                              filled: true,
+                              fillColor: Colors.grey.shade50,
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            ),
+                            items: categories.map((cat) => DropdownMenuItem(value: cat, child: Text(cat, style: const TextStyle(fontSize: 13)))).toList(),
+                            onChanged: (val) {
+                              if (val != null) setModalState(() => category = val);
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: DropdownButtonFormField<String>(
+                            initialValue: platform,
+                            decoration: InputDecoration(
+                              labelText: 'Metode',
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+                              filled: true,
+                              fillColor: Colors.grey.shade50,
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            ),
+                            items: platforms.map((p) => DropdownMenuItem(value: p, child: Text(p, style: const TextStyle(fontSize: 13)))).toList(),
+                            onChanged: (val) {
+                              if (val != null) setModalState(() => platform = val);
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Pilihan Tanggal Transaksi
+                    InkWell(
+                      onTap: () async {
+                        final picked = await showDatePicker(
+                          context: ctx,
+                          initialDate: selectedDate,
+                          firstDate: DateTime(2020),
+                          lastDate: DateTime(2030),
+                        );
+                        if (picked != null) {
+                          setModalState(() => selectedDate = picked);
+                        }
+                      },
+                      borderRadius: BorderRadius.circular(14),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade50,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: Colors.grey.shade300),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Row(
+                              children: [
+                                const Icon(Icons.calendar_today, size: 18, color: Color(0xFF0F766E)),
+                                const SizedBox(width: 10),
+                                Text(
+                                  'Tanggal: ${DateFormat('yyyy-MM-dd').format(selectedDate)}',
+                                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                                ),
+                              ],
+                            ),
+                            const Text('Ganti', style: TextStyle(color: Color(0xFF0F766E), fontWeight: FontWeight.bold, fontSize: 12)),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+
+                    // Tombol Simpan
+                    SizedBox(
+                      width: double.infinity,
+                      height: 52,
+                      child: FilledButton.icon(
+                        onPressed: () async {
+                          final cleaned = nominalController.text.replaceAll(RegExp(r'[^0-9]'), '');
+                          final amount = double.tryParse(cleaned);
+                          if (amount == null || amount <= 0) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Harap masukkan nominal yang valid!')),
+                            );
+                            return;
+                          }
+
+                          final dateStr = DateFormat('yyyy-MM-dd').format(selectedDate);
+                          final timeStr = DateFormat('HH:mm').format(DateTime.now());
+                          final desc = descController.text.trim();
+
+                          final newTx = TransactionModel(
+                            status: 'SUCCESS',
+                            flowType: flowType,
+                            sourcePlatform: platform,
+                            transactionType: flowType == 'PEMASUKAN' ? 'Uang Masuk' : 'Pembelian / Pengeluaran',
+                            amount: amount,
+                            adminFee: 0,
+                            totalAmount: amount,
+                            senderName: flowType == 'PEMASUKAN' ? (desc.isNotEmpty ? desc : 'Pendapatan Lain') : _userName,
+                            recipientName: flowType == 'PENGELUARAN' ? (desc.isNotEmpty ? desc : 'Pengeluaran Tunai') : (_userName ?? 'Saya'),
+                            destinationBankOrWallet: platform,
+                            transactionDate: dateStr,
+                            transactionTime: timeStr,
+                            description: desc.isNotEmpty ? desc : null,
+                            category: category,
+                          );
+
+                          final updated = await StorageService.addTransaction(newTx);
+                          if (ctx.mounted) Navigator.pop(ctx);
+                          if (mounted) {
+                            setState(() {
+                              _allTransactions = updated;
+                              _selectedMonth = DateTime(selectedDate.year, selectedDate.month);
+                            });
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Transaksi ${currencyFormatter.format(amount)} berhasil dicatat!'),
+                                backgroundColor: Colors.green.shade800,
+                              ),
+                            );
+                          }
+                        },
+                        icon: const Icon(Icons.check_circle_outline),
+                        label: const Text('Simpan Transaksi', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // Modal Ekspor Laporan Bulanan (CSV / WhatsApp)
+  void _showExportDialog() {
+    final currentMonthLabel = '${_monthNames[_selectedMonth.month - 1]} ${_selectedMonth.year}';
+    final transactions = _monthlyTransactions;
+
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Ekspor Laporan ($currentMonthLabel)',
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Salin ringkasan ke WhatsApp atau simpan file CSV untuk dibuka di Excel',
+                style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 20),
+              ListTile(
+                leading: CircleAvatar(
+                  backgroundColor: Colors.green.shade50,
+                  child: const Icon(Icons.copy, color: Colors.green),
+                ),
+                title: const Text('Salin Ringkasan Teks', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                subtitle: const Text('Format rapi untuk dibagikan ke WhatsApp / Catatan', style: TextStyle(fontSize: 12)),
+                trailing: const Icon(Icons.chevron_right, size: 20),
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  final text = StorageService.generateSummaryText(
+                    transactions: transactions,
+                    monthLabel: currentMonthLabel,
+                    totalPemasukan: _totalPemasukanBulanIni,
+                    totalPengeluaran: _totalPengeluaranBulanIni,
+                    sisaSaldo: _saldoBulanIni,
+                    formatCurrency: (n) => currencyFormatter.format(n),
+                  );
+                  await Clipboard.setData(ClipboardData(text: text));
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Ringkasan laporan berhasil disalin ke papan klip!'),
+                        backgroundColor: Color(0xFF0F766E),
+                      ),
+                    );
+                  }
+                },
+              ),
+              const Divider(height: 12),
+              ListTile(
+                leading: CircleAvatar(
+                  backgroundColor: Colors.blue.shade50,
+                  child: const Icon(Icons.table_chart, color: Colors.blue),
+                ),
+                title: const Text('Unduh File CSV (Excel)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                subtitle: const Text('Simpan file spreadsheet ke folder Download HP', style: TextStyle(fontSize: 12)),
+                trailing: const Icon(Icons.chevron_right, size: 20),
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  final year = _selectedMonth.year.toString();
+                  final month = _selectedMonth.month.toString().padLeft(2, '0');
+                  final fileName = 'CatatDuit_Laporan_${year}_$month.csv';
+
+                  final csv = StorageService.generateCsvString(transactions);
+                  final path = await StorageService.saveCsvToDownload(csv, fileName);
+
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('File CSV berhasil disimpan ke:\n$path'),
+                        duration: const Duration(seconds: 4),
+                        backgroundColor: Colors.blue.shade800,
+                      ),
+                    );
+                  }
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Modal Detail & Hapus Transaksi
+  void _showTransactionDetailDialog(TransactionModel tx, int originalIndex) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        final isIncome = tx.flowType == 'PEMASUKAN';
+        return Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          ),
+          padding: EdgeInsets.only(
+            left: 20,
+            right: 20,
+            top: 20,
+            bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 44,
+                  height: 5,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Detail Transaksi',
+                    style: Theme.of(ctx).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: isIncome ? Colors.green.shade50 : Colors.red.shade50,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      isIncome ? 'UANG MASUK' : 'UANG KELUAR',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: isIncome ? Colors.green.shade700 : Colors.red.shade700,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade50,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.grey.shade200),
+                ),
+                child: Column(
+                  children: [
+                    _buildRowItem('Platform', tx.sourcePlatform),
+                    const Divider(height: 16),
+                    _buildRowItem(
+                      'Nominal',
+                      '${isIncome ? '+' : '-'}${currencyFormatter.format(tx.totalAmount)}',
+                      valueStyle: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: isIncome ? Colors.green.shade700 : Colors.red.shade700,
+                      ),
+                    ),
+                    if (tx.senderName != null && tx.senderName!.isNotEmpty) ...[
+                      const Divider(height: 16),
+                      _buildRowItem('Pengirim', tx.senderName!),
+                    ],
+                    const Divider(height: 16),
+                    _buildRowItem('Penerima / Toko', tx.recipientName),
+                    if (tx.destinationBankOrWallet != null) ...[
+                      const Divider(height: 16),
+                      _buildRowItem('Bank / Tujuan', '${tx.destinationBankOrWallet} ${tx.destinationAccount ?? ""}'),
+                    ],
+                    if (tx.description != null && tx.description!.isNotEmpty) ...[
+                      const Divider(height: 16),
+                      _buildRowItem('Catatan', tx.description!),
+                    ],
+                    const Divider(height: 16),
+                    _buildRowItem('Kategori', tx.category),
+                    const Divider(height: 16),
+                    _buildRowItem('Tanggal & Jam', '${tx.transactionDate} ${tx.transactionTime ?? ""}'),
+                    if (tx.referenceNumber != null && tx.referenceNumber!.isNotEmpty) ...[
+                      const Divider(height: 16),
+                      _buildRowItem('No. Referensi', tx.referenceNumber!),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: OutlinedButton.icon(
+                  onPressed: () async {
+                    Navigator.pop(ctx);
+                    final updated = await StorageService.deleteTransaction(originalIndex);
+                    if (mounted) {
+                      setState(() {
+                        _allTransactions = updated;
+                      });
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Transaksi berhasil dihapus')),
+                      );
+                    }
+                  },
+                  icon: const Icon(Icons.delete_outline, color: Colors.red),
+                  label: const Text('Hapus Transaksi Ini', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Colors.red),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   // Filter transaksi berdasarkan bulan yang dipilih
   List<TransactionModel> get _monthlyTransactions {
     final year = _selectedMonth.year.toString();
@@ -750,6 +1352,26 @@ class _HomeScreenState extends State<HomeScreen> {
     final prefix = '$year-$month';
 
     return _allTransactions.where((t) => t.transactionDate.startsWith(prefix)).toList();
+  }
+
+  // Filter transaksi berdasarkan pencarian dan tipe arus
+  List<TransactionModel> get _filteredTransactions {
+    return _monthlyTransactions.where((tx) {
+      if (_selectedFilterFlow != 'ALL' && tx.flowType != _selectedFilterFlow) {
+        return false;
+      }
+      if (_searchQuery.isNotEmpty) {
+        final query = _searchQuery.toLowerCase();
+        final title = (tx.description?.isNotEmpty == true ? tx.description! : tx.recipientName).toLowerCase();
+        final platform = tx.sourcePlatform.toLowerCase();
+        final category = tx.category.toLowerCase();
+        final amountStr = tx.totalAmount.toInt().toString();
+        if (!title.contains(query) && !platform.contains(query) && !category.contains(query) && !amountStr.contains(query)) {
+          return false;
+        }
+      }
+      return true;
+    }).toList();
   }
 
   double get _totalPemasukanBulanIni => _monthlyTransactions
@@ -761,6 +1383,135 @@ class _HomeScreenState extends State<HomeScreen> {
       .fold(0.0, (acc, item) => acc + item.totalAmount);
 
   double get _saldoBulanIni => _totalPemasukanBulanIni - _totalPengeluaranBulanIni;
+
+  Map<String, double> get _categoryExpenses {
+    final map = <String, double>{};
+    for (final tx in _monthlyTransactions.where((t) => t.flowType == 'PENGELUARAN')) {
+      map[tx.category] = (map[tx.category] ?? 0) + tx.totalAmount;
+    }
+    return map;
+  }
+
+  IconData _getCategoryIcon(String category) {
+    switch (category) {
+      case 'Makanan & Minuman':
+        return Icons.restaurant;
+      case 'Tagihan & Utilitas':
+        return Icons.receipt_long;
+      case 'Belanja':
+        return Icons.shopping_bag;
+      case 'Transportasi':
+        return Icons.directions_car;
+      case 'Transfer / Patungan':
+        return Icons.swap_horiz;
+      case 'Hiburan':
+        return Icons.movie;
+      case 'Gaji / Pendapatan':
+        return Icons.account_balance_wallet;
+      default:
+        return Icons.category;
+    }
+  }
+
+  Color _getCategoryColor(int index) {
+    const colors = [
+      Color(0xFFE11D48), // Rose
+      Color(0xFFEA580C), // Orange
+      Color(0xFFD97706), // Amber
+      Color(0xFF059669), // Emerald
+      Color(0xFF2563EB), // Blue
+      Color(0xFF7C3AED), // Violet
+      Color(0xFFDB2777), // Pink
+      Color(0xFF475569), // Slate
+    ];
+    return colors[index % colors.length];
+  }
+
+  // Widget Kartu Distribusi Pengeluaran per Kategori
+  Widget _buildCategoryBreakdownCard() {
+    final expenses = _categoryExpenses;
+    if (expenses.isEmpty) return const SizedBox.shrink();
+
+    final total = _totalPengeluaranBulanIni;
+    final sortedEntries = expenses.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+
+    return Container(
+      margin: const EdgeInsets.only(top: 16),
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Row(
+                children: [
+                  Icon(Icons.pie_chart, size: 18, color: Color(0xFF0F766E)),
+                  SizedBox(width: 8),
+                  Text(
+                    'Kategori Pengeluaran',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                  ),
+                ],
+              ),
+              Text(
+                '${sortedEntries.length} Kategori',
+                style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          ...sortedEntries.take(4).map((entry) {
+            final cat = entry.key;
+            final amount = entry.value;
+            final percentage = total > 0 ? (amount / total) : 0.0;
+            final index = sortedEntries.indexOf(entry);
+            final color = _getCategoryColor(index);
+
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Column(
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(_getCategoryIcon(cat), size: 14, color: color),
+                          const SizedBox(width: 6),
+                          Text(cat, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                        ],
+                      ),
+                      Text(
+                        '${currencyFormatter.format(amount)} (${(percentage * 100).toStringAsFixed(0)}%)',
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey.shade700),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: LinearProgressIndicator(
+                      value: percentage,
+                      minHeight: 6,
+                      backgroundColor: Colors.grey.shade100,
+                      valueColor: AlwaysStoppedAnimation<Color>(color),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
+        ],
+      ),
+    );
+  }
 
   void _previousMonth() {
     setState(() {
@@ -777,6 +1528,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final currentMonthLabel = '${_monthNames[_selectedMonth.month - 1]} ${_selectedMonth.year}';
+    final transactionsToShow = _filteredTransactions;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
@@ -788,20 +1540,17 @@ class _HomeScreenState extends State<HomeScreen> {
         centerTitle: false,
         actions: [
           IconButton(
+            tooltip: 'Ekspor Laporan Bulanan',
+            icon: const Icon(Icons.ios_share),
+            onPressed: _showExportDialog,
+          ),
+          IconButton(
             tooltip: 'Atur Nama Pemilik',
             icon: Icon(
               Icons.account_circle,
               color: _userName != null ? Colors.teal.shade700 : Colors.grey.shade600,
             ),
             onPressed: _showProfileDialog,
-          ),
-          IconButton(
-            tooltip: 'Uji Coba Bukti ShopeePay',
-            icon: const Icon(Icons.play_circle_fill, color: Colors.teal),
-            onPressed: () {
-              final sampleTx = ScannerService.getSampleShopeePayData();
-              _showConfirmationDialog(sampleTx);
-            },
           ),
         ],
       ),
@@ -948,9 +1697,12 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
 
+              // Distribusi Pengeluaran per Kategori
+              _buildCategoryBreakdownCard(),
+
               const SizedBox(height: 20),
 
-              // Riwayat Transaksi Bulan Ini
+              // Header Riwayat Transaksi Bulan Ini
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -959,45 +1711,117 @@ class _HomeScreenState extends State<HomeScreen> {
                     style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
                   ),
                   Text(
-                    '${_monthlyTransactions.length} transaksi',
+                    '${transactionsToShow.length} dari ${_monthlyTransactions.length}',
                     style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
                   ),
                 ],
               ),
+              const SizedBox(height: 10),
+
+              // Bar Pencarian & Filter
+              TextField(
+                controller: _searchController,
+                decoration: InputDecoration(
+                  hintText: 'Cari toko, keterangan, nominal...',
+                  prefixIcon: const Icon(Icons.search, size: 20),
+                  suffixIcon: _searchQuery.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear, size: 18),
+                          onPressed: () {
+                            _searchController.clear();
+                            setState(() => _searchQuery = '');
+                          },
+                        )
+                      : null,
+                  contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 16),
+                  filled: true,
+                  fillColor: Colors.white,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide(color: Colors.grey.shade200),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide(color: Colors.grey.shade200),
+                  ),
+                ),
+                onChanged: (val) {
+                  setState(() => _searchQuery = val.trim());
+                },
+              ),
+              const SizedBox(height: 8),
+
+              // Filter Chips (Semua, Masuk, Keluar)
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    ChoiceChip(
+                      label: const Text('Semua'),
+                      selected: _selectedFilterFlow == 'ALL',
+                      onSelected: (sel) {
+                        if (sel) setState(() => _selectedFilterFlow = 'ALL');
+                      },
+                    ),
+                    const SizedBox(width: 8),
+                    ChoiceChip(
+                      label: const Text('🟢 Uang Masuk'),
+                      selected: _selectedFilterFlow == 'PEMASUKAN',
+                      onSelected: (sel) {
+                        if (sel) setState(() => _selectedFilterFlow = 'PEMASUKAN');
+                      },
+                    ),
+                    const SizedBox(width: 8),
+                    ChoiceChip(
+                      label: const Text('🔴 Uang Keluar'),
+                      selected: _selectedFilterFlow == 'PENGELUARAN',
+                      onSelected: (sel) {
+                        if (sel) setState(() => _selectedFilterFlow = 'PENGELUARAN');
+                      },
+                    ),
+                  ],
+                ),
+              ),
+
               const SizedBox(height: 12),
 
-              if (_monthlyTransactions.isEmpty)
+              if (transactionsToShow.isEmpty)
                 Container(
-                  padding: const EdgeInsets.symmetric(vertical: 40),
+                  padding: const EdgeInsets.symmetric(vertical: 36),
                   child: Center(
                     child: Column(
                       children: [
                         Icon(Icons.receipt_long_outlined, size: 54, color: Colors.grey.shade400),
                         const SizedBox(height: 12),
                         Text(
-                          'Belum ada transaksi di bulan $currentMonthLabel',
+                          _monthlyTransactions.isEmpty
+                              ? 'Belum ada transaksi di bulan $currentMonthLabel'
+                              : 'Tidak ada transaksi yang cocok dengan filter',
                           style: TextStyle(color: Colors.grey.shade600, fontWeight: FontWeight.w500),
                         ),
                         const SizedBox(height: 6),
                         Text(
-                          'Share dari aplikasi bank atau pilih screenshot dari galeri',
+                          _monthlyTransactions.isEmpty
+                              ? 'Catat manual atau pindai bukti transfer dari galeri'
+                              : 'Coba ubah kata kunci pencarian atau filter arus',
                           style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
                         ),
-                        const SizedBox(height: 16),
-                        OutlinedButton.icon(
-                          onPressed: _showImageSourceDialog,
-                          icon: const Icon(Icons.add_photo_alternate, size: 18),
-                          label: const Text('Pilih Screenshot dari Galeri'),
-                        ),
+                        if (_monthlyTransactions.isEmpty) ...[
+                          const SizedBox(height: 16),
+                          OutlinedButton.icon(
+                            onPressed: _showImageSourceDialog,
+                            icon: const Icon(Icons.add, size: 18),
+                            label: const Text('Tambah Transaksi Pertama'),
+                          ),
+                        ],
                       ],
                     ),
                   ),
                 )
               else
-                ..._monthlyTransactions.asMap().entries.map((entry) {
-                  final index = entry.key;
-                  final tx = entry.value;
-                  return _buildTransactionCard(tx, index);
+                ...transactionsToShow.map((tx) {
+                  final originalIndex = _allTransactions.indexOf(tx);
+                  return _buildTransactionCard(tx, originalIndex);
                 }),
             ],
           ),
@@ -1032,19 +1856,19 @@ class _HomeScreenState extends State<HomeScreen> {
         backgroundColor: const Color(0xFF0F766E),
         foregroundColor: Colors.white,
         elevation: 4,
-        icon: const Icon(Icons.add_photo_alternate),
+        icon: const Icon(Icons.add),
         label: const Text(
-          'Pilih Screenshot / Foto',
+          'Tambah Transaksi',
           style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
         ),
       ),
     );
   }
 
-  Widget _buildTransactionCard(TransactionModel tx, int index) {
+  Widget _buildTransactionCard(TransactionModel tx, int originalIndex) {
     final isIncome = tx.flowType == 'PEMASUKAN';
     return Dismissible(
-      key: Key('${tx.transactionDate}_${tx.referenceNumber}_$index'),
+      key: Key('${tx.transactionDate}_${tx.referenceNumber}_$originalIndex'),
       direction: DismissDirection.endToStart,
       background: Container(
         alignment: Alignment.centerRight,
@@ -1056,8 +1880,7 @@ class _HomeScreenState extends State<HomeScreen> {
         child: const Icon(Icons.delete, color: Colors.white),
       ),
       onDismissed: (direction) async {
-        final originalIndex = _allTransactions.indexOf(tx);
-        if (originalIndex != -1) {
+        if (originalIndex != -1 && originalIndex < _allTransactions.length) {
           final updated = await StorageService.deleteTransaction(originalIndex);
           if (mounted) {
             setState(() {
@@ -1077,6 +1900,7 @@ class _HomeScreenState extends State<HomeScreen> {
           side: BorderSide(color: Colors.grey.shade200),
         ),
         child: ListTile(
+          onTap: () => _showTransactionDetailDialog(tx, originalIndex),
           contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           leading: CircleAvatar(
             backgroundColor: isIncome ? Colors.green.shade50 : Colors.red.shade50,
