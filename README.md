@@ -8,10 +8,10 @@ Aplikasi Android cerdas pencatat pemasukan dan pengeluaran secara otomatis melal
 
 ## ✨ Fitur Utama
 
-- ⚡ **100% Offline & Tanpa API Key**: Memanfaatkan Google ML Kit Text Recognition on-device, cepat, hemat baterai, dan aman bagi privasi data perbankan.
+- ⚡ **Catat Cepat Interaktif (Smart Numpad & Preset)**: Input transaksi tanpa bukti struk kini jauh lebih interaktif dan bermanfaat. Dilengkapi numpad responsif dengan haptic feedback, tombol cepat kelipatan nominal (`+5rb`, `+10rb`, `+20rb`, `+50rb`, `+100rb`), preset 1-ketuk (Es Kopi, Makan Siang, Bensin, Parkir, Listrik, Belanja), serta live budget preview yang memperlihatkan dampak transaksi terhadap sisa saldo secara real-time.
+- 🎯 **Rasio Finansial 50/30/20 (Kebutuhan vs Jajan)**: Tagging otomatis atau manual untuk memisahkan pengeluaran primer (*Kebutuhan*) dengan pengeluaran tersier (*Keinginan/Jajan*), dilengkapi bar visual rasio di kartu evaluasi bulanan.
 - ✂️ **Interactive Image Cropper**: Potong screenshot mutasi rekening atau struk belanja untuk menghilangkan elemen yang tidak perlu (saldo utama, jam, status bar baterai) agar nominal terbaca 100% presisi.
 - 🔄 **Share Sheet Integration (Android Send Intent)**: Bagikan bukti transfer langsung dari aplikasi m-Banking atau Galeri ke CatatDuit tanpa perlu membuka aplikasi terlebih dahulu.
-- ✍️ **Pencatatan Transaksi Manual (Kas / Tunai)**: Catat transaksi tunai sehari-hari (warteg, parkir, belanja pasar) lengkap dengan kategori, metode pembayaran, dan tanggal fleksibel.
 - 📤 **Ekspor Laporan Bulanan (CSV & WhatsApp)**: Unduh data ke file CSV spreadsheet untuk dibuka di Excel/Google Sheets atau salin ringkasan teks terformat rapi untuk dibagikan ke WhatsApp.
 - 📊 **Distribusi Pengeluaran per Kategori**: Pantau ke mana saja uang Anda pergi lewat bar persentase visual pengeluaran bulanan.
 - 🔍 **Pencarian & Filter Arus Real-Time**: Temukan transaksi dalam hitungan detik dengan pencarian toko/catatan serta filter chip (*Semua*, *🟢 Uang Masuk*, *🔴 Uang Keluar*).
@@ -24,9 +24,9 @@ Aplikasi Android cerdas pencatat pemasukan dan pengeluaran secara otomatis melal
 ## 📱 Alur Penggunaan
 
 1. **Tambah Transaksi**:
-   - **Scan Otomatis**: Pilih foto/screenshot dari galeri atau kamera, potong area nominal, lalu konfirmasi.
+   - **Catat Cepat (Tanpa Bukti)**: Tekan tombol *⚡ Catat Cepat* di beranda untuk memasukkan nominal via Smart Numpad interaktif, memilih preset pengeluaran, serta memantau simulasi sisa saldo dan rasio kebutuhan vs jajan seketika.
+   - **Scan Otomatis**: Pilih foto/screenshot dari galeri atau kamera, potong area nominal dengan alat crop, lalu konfirmasi.
    - **Share Langsung**: Dari m-Banking/e-Wallet, tekan *Share* lalu pilih **CatatDuit**.
-   - **Input Manual**: Tekan *Tambah Transaksi* lalu pilih *Catat Manual* untuk pembayaran kas/tunai.
 2. **Kelola & Pantau**:
    - Gunakan filter atau pencarian untuk mengecek transaksi tertentu.
    - Perhatikan bar distribusi kategori untuk evaluasi anggaran bulanan.
