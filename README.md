@@ -8,6 +8,7 @@ Aplikasi Android cerdas pencatat pemasukan dan pengeluaran secara otomatis melal
 
 ## ✨ Fitur Utama
 
+- 🔥 **Daily Habit & Streak Gamifikasi (Klaim Hari Hemat Rp 0)**: Membangun kebiasaan sadar finansial tanpa terbebani notifikasi spam. Cukup luangkan 3 detik sehari: ketuk **`[ 🛡️ Hari Ini Rp 0 (Hemat) ]`** untuk merayakan hari tanpa jajan impulsif, atau ketuk **`[ ⚡ Ada Jajan ]`** untuk input kilat. Dilengkapi kalender dot 7 hari terakhir, pangkat finansial (*🌱 Pemula*, *🛡️ Penjaga Dompet*, *⚡ Master*, *👑 Sultan Anti-Boncos*), dan rekap total hari hemat bulanan.
 - ⚡ **Catat Cepat Interaktif (Smart Numpad & Preset)**: Input transaksi tanpa bukti struk kini jauh lebih interaktif dan bermanfaat. Dilengkapi numpad responsif dengan haptic feedback, tombol cepat kelipatan nominal (`+5rb`, `+10rb`, `+20rb`, `+50rb`, `+100rb`), preset 1-ketuk (Es Kopi, Makan Siang, Bensin, Parkir, Listrik, Belanja), serta live budget preview yang memperlihatkan dampak transaksi terhadap sisa saldo secara real-time.
 - 🎯 **Rasio Finansial 50/30/20 (Kebutuhan vs Jajan)**: Tagging otomatis atau manual untuk memisahkan pengeluaran primer (*Kebutuhan*) dengan pengeluaran tersier (*Keinginan/Jajan*), dilengkapi bar visual rasio di kartu evaluasi bulanan.
 - ✂️ **Interactive Image Cropper**: Potong screenshot mutasi rekening atau struk belanja untuk menghilangkan elemen yang tidak perlu (saldo utama, jam, status bar baterai) agar nominal terbaca 100% presisi.

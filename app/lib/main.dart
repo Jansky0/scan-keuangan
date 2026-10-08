@@ -45,6 +45,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   late StreamSubscription _intentSub;
   List<TransactionModel> _allTransactions = [];
+  Set<String> _noSpendDays = {};
   bool _isScanning = false;
   DateTime _selectedMonth = DateTime(DateTime.now().year, DateTime.now().month);
   String? _userName;
@@ -73,10 +74,12 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _loadStoredData() async {
     final list = await StorageService.loadTransactions();
     final name = await StorageService.getUserName();
+    final noSpend = await StorageService.loadNoSpendDays();
     if (mounted) {
       setState(() {
         _allTransactions = list;
         _userName = name;
+        _noSpendDays = noSpend;
       });
     }
   }
@@ -599,12 +602,14 @@ class _HomeScreenState extends State<HomeScreen> {
                           );
 
                           final updated = await StorageService.addTransaction(finalTx);
+                          final updatedNoSpend = await StorageService.removeNoSpendDay(finalTx.transactionDate);
                           if (ctx.mounted) {
                             Navigator.pop(ctx);
                           }
                           if (mounted) {
                             setState(() {
                               _allTransactions = updated;
+                              _noSpendDays = updatedNoSpend;
                             });
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
@@ -1224,10 +1229,12 @@ class _HomeScreenState extends State<HomeScreen> {
                                 );
 
                                 final updated = await StorageService.addTransaction(newTx);
+                                final updatedNoSpend = await StorageService.removeNoSpendDay(newTx.transactionDate);
                                 if (ctx.mounted) Navigator.pop(ctx);
                                 if (mounted) {
                                   setState(() {
                                     _allTransactions = updated;
+                                    _noSpendDays = updatedNoSpend;
                                   });
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
@@ -1787,6 +1794,503 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  // Klaim status Hari Hemat Rp 0 hari ini
+  Future<void> _claimNoSpendToday() async {
+    HapticFeedback.mediumImpact();
+    final todayStr = StorageService.formatDateKey(DateTime.now());
+    final updated = await StorageService.addNoSpendDay(todayStr);
+    if (mounted) {
+      setState(() {
+        _noSpendDays = updated;
+      });
+    }
+
+    final streak = StorageService.calculateStreak(
+      transactions: _allTransactions,
+      noSpendDays: updated,
+    );
+    final title = StorageService.getFinancialTitle(streak);
+    final noSpendCount = StorageService.countNoSpendThisMonth(updated, _selectedMonth);
+
+    _showNoSpendCelebrationModal(streak: streak, title: title, monthCount: noSpendCount);
+  }
+
+  // Batalkan status Hari Hemat Rp 0 hari ini (misal ternyata jajan malam hari)
+  Future<void> _cancelNoSpendToday() async {
+    final todayStr = StorageService.formatDateKey(DateTime.now());
+    final updated = await StorageService.removeNoSpendDay(todayStr);
+    if (mounted) {
+      setState(() {
+        _noSpendDays = updated;
+      });
+    }
+    // Langsung buka modal catat cepat agar user bisa mencatat jajannya
+    _showSmartQuickInputModal();
+  }
+
+  // Dialog untuk mengklaim hari kemarin jika sempat terlewat
+  void _promptBackfillNoSpend(String dateStr, String dayName) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            const Icon(Icons.shield, color: Color(0xFF059669)),
+            const SizedBox(width: 8),
+            Text('Klaim $dayName ($dateStr)', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: const Text(
+          'Apakah di hari ini kamu juga sukses berhemat tanpa pengeluaran sama sekali (Rp 0)?\nKlaim sekarang agar catatan streak disiplinmu tidak terputus.',
+          style: TextStyle(fontSize: 13),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Batal'),
+          ),
+          ElevatedButton.icon(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              final updated = await StorageService.addNoSpendDay(dateStr);
+              if (mounted) {
+                setState(() => _noSpendDays = updated);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Hari $dayName ($dateStr) tercatat sebagai Hari Hemat! 🛡️'),
+                    backgroundColor: Colors.green.shade800,
+                  ),
+                );
+              }
+            },
+            icon: const Icon(Icons.shield, size: 16),
+            label: const Text('Klaim Hari Hemat'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF059669),
+              foregroundColor: Colors.white,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Modal Apresiasi & Gamifikasi saat Klaim Hari Hemat Rp 0
+  void _showNoSpendCelebrationModal({
+    required int streak,
+    required String title,
+    required int monthCount,
+  }) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 44,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+              const SizedBox(height: 18),
+              Container(
+                width: 76,
+                height: 76,
+                decoration: BoxDecoration(
+                  color: Colors.green.shade50,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.green.shade200, width: 2),
+                ),
+                alignment: Alignment.center,
+                child: const Text('🛡️', style: TextStyle(fontSize: 36)),
+              ),
+              const SizedBox(height: 14),
+              const Text(
+                'Hari Hemat Rp 0 Berhasil Dicatat!',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Hebat! Menahan pengeluaran impulsif adalah langkah besar menuju kebebasan finansial.',
+                style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 18),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade50,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.grey.shade200),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        children: [
+                          const Text('🔥 Streak Harian', style: TextStyle(fontSize: 11, color: Colors.black54)),
+                          const SizedBox(height: 4),
+                          Text(
+                            '$streak Hari',
+                            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.deepOrange),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Container(height: 30, width: 1, color: Colors.grey.shade300),
+                    Expanded(
+                      child: Column(
+                        children: [
+                          const Text('🛡️ Hemat Bulan Ini', style: TextStyle(fontSize: 11, color: Colors.black54)),
+                          const SizedBox(height: 4),
+                          Text(
+                            '$monthCount Hari',
+                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.green.shade700),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0F766E).withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.military_tech, color: Color(0xFF0F766E), size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Pangkat Keuangan: $title',
+                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF0F766E)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF059669),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  ),
+                  child: const Text(
+                    'Mantap, Pertahankan! 🚀',
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Kartu Habit Harian & Streak Gamifikasi di Beranda
+  Widget _buildDailyStreakCard() {
+    final todayStr = StorageService.formatDateKey(DateTime.now());
+    final streak = StorageService.calculateStreak(
+      transactions: _allTransactions,
+      noSpendDays: _noSpendDays,
+    );
+    final title = StorageService.getFinancialTitle(streak);
+    final weekly = StorageService.getWeeklyActivity(
+      transactions: _allTransactions,
+      noSpendDays: _noSpendDays,
+    );
+    final todayTxs = _allTransactions.where((t) => t.transactionDate == todayStr).toList();
+    final isTodayNoSpend = _noSpendDays.contains(todayStr);
+    final isTodayCompleted = todayTxs.isNotEmpty || isTodayNoSpend;
+    final noSpendMonthCount = StorageService.countNoSpendThisMonth(_noSpendDays, _selectedMonth);
+
+    return Container(
+      margin: const EdgeInsets.only(top: 14),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isTodayCompleted ? const Color(0xFFF0FDF4) : Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: isTodayCompleted ? const Color(0xFF86EFAC) : Colors.amber.shade200,
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: (isTodayCompleted ? Colors.green : Colors.amber).withValues(alpha: 0.08),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Baris Atas: Icon, Judul Streak & Status
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: isTodayCompleted ? Colors.green.shade100 : Colors.amber.shade100,
+                  shape: BoxShape.circle,
+                ),
+                child: Text(
+                  isTodayCompleted ? '🔥' : '⏳',
+                  style: const TextStyle(fontSize: 18),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          streak > 0 ? '$streak Hari Beruntun' : 'Mulai Kebiasaan',
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF1E293B),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF0F766E).withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            title,
+                            style: const TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF0F766E),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      isTodayCompleted
+                          ? (isTodayNoSpend
+                              ? 'Hari ini: 🛡️ Hari Hemat Rp 0 aktif'
+                              : 'Hari ini: ${todayTxs.length} transaksi tercatat')
+                          : 'Cek keuangan hari ini untuk menjaga streak!',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isTodayCompleted ? Colors.green.shade800 : Colors.grey.shade600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (noSpendMonthCount > 0)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.green.shade50,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.green.shade200),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.shield, size: 12, color: Colors.green),
+                      const SizedBox(width: 4),
+                      Text(
+                        '$noSpendMonthCount hari hemat',
+                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.green.shade800),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+
+          const SizedBox(height: 12),
+
+          // Kalender 7 Hari Terakhir
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+            decoration: BoxDecoration(
+              color: isTodayCompleted ? Colors.white.withValues(alpha: 0.8) : Colors.grey.shade50,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: weekly.map((day) {
+                final isToday = day.isToday;
+                Color dotBg;
+                Widget dotChild;
+
+                if (day.hasTransaction) {
+                  dotBg = Colors.amber.shade100;
+                  dotChild = const Text('🔥', style: TextStyle(fontSize: 11));
+                } else if (day.isNoSpend) {
+                  dotBg = Colors.green.shade100;
+                  dotChild = const Icon(Icons.shield, size: 12, color: Colors.green);
+                } else if (isToday) {
+                  dotBg = Colors.amber.shade50;
+                  dotChild = const Text('⏳', style: TextStyle(fontSize: 10));
+                } else {
+                  dotBg = Colors.grey.shade200;
+                  dotChild = Container(
+                    width: 4,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade400,
+                      shape: BoxShape.circle,
+                    ),
+                  );
+                }
+
+                return InkWell(
+                  onTap: () {
+                    if (!isToday && day.isMissed) {
+                      _promptBackfillNoSpend(day.dateStr, day.dayName);
+                    }
+                  },
+                  borderRadius: BorderRadius.circular(8),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                    child: Column(
+                      children: [
+                        Text(
+                          isToday ? 'Hari Ini' : day.dayName,
+                          style: TextStyle(
+                            fontSize: isToday ? 10 : 11,
+                            fontWeight: isToday ? FontWeight.bold : FontWeight.w500,
+                            color: isToday ? const Color(0xFF0F766E) : Colors.grey.shade600,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Container(
+                          width: 26,
+                          height: 26,
+                          decoration: BoxDecoration(
+                            color: dotBg,
+                            shape: BoxShape.circle,
+                            border: isToday
+                                ? Border.all(color: const Color(0xFF0F766E), width: 1.5)
+                                : null,
+                          ),
+                          alignment: Alignment.center,
+                          child: dotChild,
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+
+          const SizedBox(height: 12),
+
+          // Tombol Aksi Harian
+          if (!isTodayCompleted) ...[
+            Row(
+              children: [
+                Expanded(
+                  flex: 3,
+                  child: ElevatedButton.icon(
+                    onPressed: _claimNoSpendToday,
+                    icon: const Icon(Icons.shield_outlined, size: 18),
+                    label: const Text(
+                      'Hari Ini Rp 0 (Hemat)',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF059669),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 11),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      elevation: 0,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  flex: 2,
+                  child: OutlinedButton.icon(
+                    onPressed: _showSmartQuickInputModal,
+                    icon: const Icon(Icons.edit_outlined, size: 16),
+                    label: const Text(
+                      'Ada Jajan',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFF0F766E),
+                      side: const BorderSide(color: Color(0xFF0F766E)),
+                      padding: const EdgeInsets.symmetric(vertical: 11),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ] else if (isTodayNoSpend) ...[
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.check_circle, size: 16, color: Colors.green.shade700),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Terklaim No-Spend Day! 🛡️',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.green.shade800,
+                      ),
+                    ),
+                  ],
+                ),
+                TextButton(
+                  onPressed: _cancelNoSpendToday,
+                  style: TextButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                  ),
+                  child: const Text(
+                    'Eh, ada jajan tadi',
+                    style: TextStyle(fontSize: 11, color: Colors.black54),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
   void _previousMonth() {
     setState(() {
       _selectedMonth = DateTime(_selectedMonth.year, _selectedMonth.month - 1);
@@ -2011,6 +2515,9 @@ class _HomeScreenState extends State<HomeScreen> {
                   ],
                 ),
               ),
+
+              // Kartu Daily Habit & Streak Gamifikasi
+              _buildDailyStreakCard(),
 
               // Distribusi Pengeluaran per Kategori
               _buildCategoryBreakdownCard(),

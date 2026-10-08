@@ -47,7 +47,6 @@ class StorageService {
     }
     return currentList;
   }
-
   /// Mengambil nama pemilik HP (untuk deteksi otomatis transfer masuk/keluar)
   static Future<String?> getUserName() async {
     final prefs = await SharedPreferences.getInstance();
@@ -58,6 +57,138 @@ class StorageService {
   static Future<void> saveUserName(String name) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_keyUserName, name.trim());
+  }
+
+  static const String _keyNoSpendDays = 'user_no_spend_days';
+
+  /// Memuat daftar tanggal yang diklaim sebagai 'Hari Hemat Rp 0'
+  static Future<Set<String>> loadNoSpendDays() async {
+    final prefs = await SharedPreferences.getInstance();
+    final list = prefs.getStringList(_keyNoSpendDays) ?? [];
+    return list.toSet();
+  }
+
+  /// Menandai tanggal tertentu sebagai Hari Hemat Rp 0 (atau membatalkannya)
+  static Future<Set<String>> toggleNoSpendDay(String dateStr) async {
+    final prefs = await SharedPreferences.getInstance();
+    final current = (prefs.getStringList(_keyNoSpendDays) ?? []).toSet();
+    if (current.contains(dateStr)) {
+      current.remove(dateStr);
+    } else {
+      current.add(dateStr);
+    }
+    await prefs.setStringList(_keyNoSpendDays, current.toList());
+    return current;
+  }
+
+  /// Menambahkan tanggal Hari Hemat Rp 0
+  static Future<Set<String>> addNoSpendDay(String dateStr) async {
+    final prefs = await SharedPreferences.getInstance();
+    final current = (prefs.getStringList(_keyNoSpendDays) ?? []).toSet();
+    current.add(dateStr);
+    await prefs.setStringList(_keyNoSpendDays, current.toList());
+    return current;
+  }
+
+  /// Menghapus tanggal Hari Hemat Rp 0
+  static Future<Set<String>> removeNoSpendDay(String dateStr) async {
+    final prefs = await SharedPreferences.getInstance();
+    final current = (prefs.getStringList(_keyNoSpendDays) ?? []).toSet();
+    if (current.contains(dateStr)) {
+      current.remove(dateStr);
+      await prefs.setStringList(_keyNoSpendDays, current.toList());
+    }
+    return current;
+  }
+
+  /// Format tanggal standar yyyy-MM-dd
+  static String formatDateKey(DateTime d) {
+    return '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+  }
+
+  /// Menghitung streak berturut-turut (dalam hari)
+  static int calculateStreak({
+    required List<TransactionModel> transactions,
+    required Set<String> noSpendDays,
+  }) {
+    final activeDates = <String>{};
+    for (final t in transactions) {
+      activeDates.add(t.transactionDate);
+    }
+    activeDates.addAll(noSpendDays);
+
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final todayStr = formatDateKey(today);
+    final yesterday = today.subtract(const Duration(days: 1));
+    final yesterdayStr = formatDateKey(yesterday);
+
+    // Jika hari ini belum aktif dan kemarin juga tidak aktif, streak = 0
+    if (!activeDates.contains(todayStr) && !activeDates.contains(yesterdayStr)) {
+      return 0;
+    }
+
+    int streak = 0;
+    DateTime checkDate = activeDates.contains(todayStr) ? today : yesterday;
+
+    while (true) {
+      final key = formatDateKey(checkDate);
+      if (activeDates.contains(key)) {
+        streak++;
+        checkDate = checkDate.subtract(const Duration(days: 1));
+      } else {
+        break;
+      }
+    }
+    return streak;
+  }
+
+  /// Mengambil gelar/pangkat gamifikasi berdasarkan panjang streak
+  static String getFinancialTitle(int streak) {
+    if (streak >= 30) return '👑 Sultan Anti-Boncos';
+    if (streak >= 14) return '💎 Pendekar Finansial Bijak';
+    if (streak >= 7) return '⚡ Master Arus Kas';
+    if (streak >= 3) return '🛡️ Penjaga Dompet Disiplin';
+    if (streak >= 1) return '🌱 Pemula Sadar Keuangan';
+    return '🌱 Siap Memulai Kebiasaan';
+  }
+
+  /// Menghitung jumlah hari hemat Rp 0 pada bulan tertentu
+  static int countNoSpendThisMonth(Set<String> noSpendDays, DateTime month) {
+    final prefix = '${month.year.toString().padLeft(4, '0')}-${month.month.toString().padLeft(2, '0')}';
+    return noSpendDays.where((d) => d.startsWith(prefix)).length;
+  }
+
+  /// Menghasilkan status 7 hari terakhir (H-6 hingga Hari Ini)
+  static List<DailyActivityDay> getWeeklyActivity({
+    required List<TransactionModel> transactions,
+    required Set<String> noSpendDays,
+  }) {
+    const dayNames = ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'];
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final todayStr = formatDateKey(today);
+
+    final result = <DailyActivityDay>[];
+    for (int i = 6; i >= 0; i--) {
+      final d = today.subtract(Duration(days: i));
+      final dateStr = formatDateKey(d);
+      final hasTx = transactions.any((t) => t.transactionDate == dateStr);
+      final isNoSpend = noSpendDays.contains(dateStr);
+      final isToday = dateStr == todayStr;
+      final isMissed = !hasTx && !isNoSpend && !isToday;
+
+      result.add(DailyActivityDay(
+        date: d,
+        dateStr: dateStr,
+        dayName: dayNames[d.weekday - 1],
+        hasTransaction: hasTx,
+        isNoSpend: isNoSpend,
+        isToday: isToday,
+        isMissed: isMissed,
+      ));
+    }
+    return result;
   }
 
   /// Menghasilkan format string CSV dari daftar transaksi
@@ -131,5 +262,26 @@ class StorageService {
     buffer.writeln('\nGenerated with CatatDuit (100% Offline OCR & Expense Tracker)');
     return buffer.toString();
   }
+}
+
+/// Model untuk representasi status aktivitas harian dalam seminggu
+class DailyActivityDay {
+  final DateTime date;
+  final String dateStr;
+  final String dayName; // 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'
+  final bool hasTransaction;
+  final bool isNoSpend;
+  final bool isToday;
+  final bool isMissed;
+
+  DailyActivityDay({
+    required this.date,
+    required this.dateStr,
+    required this.dayName,
+    required this.hasTransaction,
+    required this.isNoSpend,
+    required this.isToday,
+    required this.isMissed,
+  });
 }
 
