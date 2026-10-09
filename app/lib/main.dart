@@ -53,6 +53,40 @@ class _HomeScreenState extends State<HomeScreen> {
   String _selectedFilterFlow = 'ALL';
   final TextEditingController _searchController = TextEditingController();
 
+  bool _isBalanceVisible = true;
+  int _selectedCardSkinIndex = 0;
+
+  static const List<Map<String, dynamic>> _cardSkins = [
+    {
+      'name': 'Emerald Obsidian',
+      'colors': [Color(0xFF062824), Color(0xFF0F766E), Color(0xFF041F1C)],
+      'accent': Color(0xFF34D399),
+      'chip': Color(0xFFD4AF37),
+      'tag': 'DEBIT PLATINUM',
+    },
+    {
+      'name': 'Midnight Sapphire',
+      'colors': [Color(0xFF0B132B), Color(0xFF1E3A8A), Color(0xFF080D1A)],
+      'accent': Color(0xFF60A5FA),
+      'chip': Color(0xFFE2E8F0),
+      'tag': 'BLACK CARD',
+    },
+    {
+      'name': 'Neon Amethyst',
+      'colors': [Color(0xFF2E1065), Color(0xFF7E22CE), Color(0xFF1B0736)],
+      'accent': Color(0xFFC084FC),
+      'chip': Color(0xFFFDE047),
+      'tag': 'CYBER POCKET',
+    },
+    {
+      'name': 'Titanium Gold',
+      'colors': [Color(0xFF1C1917), Color(0xFF44403C), Color(0xFF141210)],
+      'accent': Color(0xFFFBBF24),
+      'chip': Color(0xFFEAB308),
+      'tag': 'ROYAL GOLD',
+    },
+  ];
+
   final currencyFormatter = NumberFormat.currency(
     locale: 'id_ID',
     symbol: 'Rp ',
@@ -75,11 +109,15 @@ class _HomeScreenState extends State<HomeScreen> {
     final list = await StorageService.loadTransactions();
     final name = await StorageService.getUserName();
     final noSpend = await StorageService.loadNoSpendDays();
+    final skinIndex = await StorageService.loadCardSkinIndex();
+    final isVisible = await StorageService.loadBalanceVisibility();
     if (mounted) {
       setState(() {
         _allTransactions = list;
         _userName = name;
         _noSpendDays = noSpend;
+        _selectedCardSkinIndex = skinIndex.clamp(0, _cardSkins.length - 1);
+        _isBalanceVisible = isVisible;
       });
     }
   }
@@ -2077,18 +2115,22 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                         ),
                         const SizedBox(width: 6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF0F766E).withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            title,
-                            style: const TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF0F766E),
+                        Flexible(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF0F766E).withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF0F766E),
+                              ),
                             ),
                           ),
                         ),
@@ -2258,19 +2300,25 @@ class _HomeScreenState extends State<HomeScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
-                  children: [
-                    Icon(Icons.check_circle, size: 16, color: Colors.green.shade700),
-                    const SizedBox(width: 6),
-                    Text(
-                      'Terklaim No-Spend Day! 🛡️',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.green.shade800,
+                Expanded(
+                  child: Row(
+                    children: [
+                      Icon(Icons.check_circle, size: 16, color: Colors.green.shade700),
+                      const SizedBox(width: 6),
+                      Flexible(
+                        child: Text(
+                          'Terklaim No-Spend Day! 🛡️',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.green.shade800,
+                          ),
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
                 TextButton(
                   onPressed: _cancelNoSpendToday,
@@ -2287,6 +2335,595 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ],
         ],
+      ),
+    );
+  }
+
+  // Toggle visibilitas saldo (fitur sensor mata)
+  void _toggleBalanceVisibility() async {
+    HapticFeedback.lightImpact();
+    final next = !_isBalanceVisible;
+    setState(() => _isBalanceVisible = next);
+    await StorageService.saveBalanceVisibility(next);
+  }
+
+  // Ganti tema / skin visual kartu neo-bank
+  void _cycleCardSkin() async {
+    HapticFeedback.selectionClick();
+    final next = (_selectedCardSkinIndex + 1) % _cardSkins.length;
+    setState(() => _selectedCardSkinIndex = next);
+    await StorageService.saveCardSkinIndex(next);
+    if (mounted) {
+      ScaffoldMessenger.of(context).removeCurrentSnackBar();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Tema Kartu: ${_cardSkins[next]['name']} ✨'),
+          duration: const Duration(seconds: 1),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  // Pengatur Bulan Bergaya Floating Glass
+  Widget _buildMonthSelector(String currentMonthLabel) {
+    final now = DateTime.now();
+    final isCurrentMonth = _selectedMonth.year == now.year && _selectedMonth.month == now.month;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Colors.grey.shade200),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          IconButton(
+            icon: const Icon(Icons.arrow_back_ios_new, size: 15),
+            color: Colors.grey.shade700,
+            onPressed: _previousMonth,
+            tooltip: 'Bulan Sebelumnya',
+          ),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.calendar_month, size: 17, color: Color(0xFF0F766E)),
+              const SizedBox(width: 6),
+              Text(
+                currentMonthLabel,
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF0F172A)),
+              ),
+              if (!isCurrentMonth) ...[
+                const SizedBox(width: 8),
+                InkWell(
+                  onTap: () {
+                    setState(() {
+                      _selectedMonth = DateTime(now.year, now.month);
+                    });
+                  },
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.teal.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.teal.shade200),
+                    ),
+                    child: const Text(
+                      'Bulan Ini',
+                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF0F766E)),
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+          IconButton(
+            icon: const Icon(Icons.arrow_forward_ios, size: 15),
+            color: Colors.grey.shade700,
+            onPressed: _nextMonth,
+            tooltip: 'Bulan Berikutnya',
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Kartu Utama Bergaya Neo-Banking Digital Card (Besar & Interaktif)
+  Widget _buildNeoBankHeroCard(String currentMonthLabel) {
+    final skin = _cardSkins[_selectedCardSkinIndex];
+    final List<Color> colors = skin['colors'];
+    final Color accent = skin['accent'];
+    final Color chipColor = skin['chip'];
+    final String tag = skin['tag'];
+
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(26),
+        boxShadow: [
+          BoxShadow(
+            color: accent.withValues(alpha: 0.28),
+            blurRadius: 24,
+            offset: const Offset(0, 10),
+          ),
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.2),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(26),
+        child: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: colors,
+            ),
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.16),
+              width: 1.2,
+            ),
+          ),
+          child: Stack(
+            children: [
+              // Ambient Glowing Orb 1 (Top Right)
+              Positioned(
+                top: -30,
+                right: -30,
+                child: Container(
+                  width: 160,
+                  height: 160,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: RadialGradient(
+                      colors: [
+                        accent.withValues(alpha: 0.35),
+                        Colors.transparent,
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+
+              // Ambient Glowing Orb 2 (Bottom Left)
+              Positioned(
+                bottom: -40,
+                left: -20,
+                child: Container(
+                  width: 140,
+                  height: 140,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: RadialGradient(
+                      colors: [
+                        Colors.white.withValues(alpha: 0.08),
+                        Colors.transparent,
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+
+              // Watermark Halus
+              Positioned(
+                right: 36,
+                top: 48,
+                child: Opacity(
+                  opacity: 0.05,
+                  child: const Icon(Icons.currency_exchange, size: 140, color: Colors.white),
+                ),
+              ),
+
+              // Card Content
+              Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Baris Atas: Brand & Tag, Contactless, Switcher Tema
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            const Text(
+                              'CatatDuit',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 1.2,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+                              ),
+                              child: Text(
+                                tag,
+                                style: TextStyle(
+                                  color: accent,
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 0.6,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        Row(
+                          children: [
+                            const Icon(Icons.contactless, color: Colors.white70, size: 22),
+                            const SizedBox(width: 8),
+                            InkWell(
+                              onTap: _cycleCardSkin,
+                              borderRadius: BorderRadius.circular(12),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.14),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
+                                ),
+                                child: const Row(
+                                  children: [
+                                    Icon(Icons.palette_outlined, size: 13, color: Colors.white),
+                                    SizedBox(width: 4),
+                                    Text(
+                                      'Tema',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 16),
+
+                    // Baris Tengah: EMV Chip & Sisa Saldo
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        // Chip Kartu Fisik Realistis
+                        Container(
+                          width: 44,
+                          height: 32,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(6),
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [
+                                chipColor,
+                                chipColor.withValues(alpha: 0.8),
+                                chipColor.withValues(alpha: 0.6),
+                              ],
+                            ),
+                            border: Border.all(color: Colors.black26, width: 0.8),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.2),
+                                blurRadius: 4,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: Stack(
+                            children: [
+                              Center(
+                                child: Container(
+                                  width: 24,
+                                  height: 18,
+                                  decoration: BoxDecoration(
+                                    border: Border.all(color: Colors.black26, width: 0.8),
+                                    borderRadius: BorderRadius.circular(3),
+                                  ),
+                                ),
+                              ),
+                              Positioned(left: 8, top: 0, bottom: 0, child: Container(width: 0.8, color: Colors.black26)),
+                              Positioned(right: 8, top: 0, bottom: 0, child: Container(width: 0.8, color: Colors.black26)),
+                              Positioned(top: 15, left: 0, right: 0, child: Container(height: 0.8, color: Colors.black26)),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+
+                        // Label Saldo & Tombol Sensor Mata
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  const Text(
+                                    'SALDO KEUANGAN',
+                                    style: TextStyle(
+                                      color: Colors.white70,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      letterSpacing: 1.0,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  InkWell(
+                                    onTap: _toggleBalanceVisibility,
+                                    child: Icon(
+                                      _isBalanceVisible ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                                      color: Colors.white70,
+                                      size: 16,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                _isBalanceVisible
+                                    ? currencyFormatter.format(_saldoBulanIni)
+                                    : 'Rp • • • • • • •',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: _isBalanceVisible ? 26 : 22,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: _isBalanceVisible ? -0.5 : 2.0,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 18),
+
+                    // Baris Bawah 1: Frosted Glass Pills (Masuk & Keluar)
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+                            ),
+                            child: Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(4),
+                                  decoration: BoxDecoration(
+                                    color: Colors.greenAccent.withValues(alpha: 0.2),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(Icons.arrow_downward, color: Colors.greenAccent, size: 12),
+                                ),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      const Text('Masuk', style: TextStyle(color: Colors.white60, fontSize: 10)),
+                                      Text(
+                                        _isBalanceVisible
+                                            ? currencyFormatter.format(_totalPemasukanBulanIni)
+                                            : '+Rp •••',
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+                            ),
+                            child: Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(4),
+                                  decoration: BoxDecoration(
+                                    color: Colors.redAccent.withValues(alpha: 0.2),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(Icons.arrow_upward, color: Colors.redAccent, size: 12),
+                                ),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      const Text('Keluar', style: TextStyle(color: Colors.white60, fontSize: 10)),
+                                      Text(
+                                        _isBalanceVisible
+                                            ? currencyFormatter.format(_totalPengeluaranBulanIni)
+                                            : '-Rp •••',
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 12),
+
+                    // Baris Bawah 2: Nama Pemegang Kartu & Bulan Berjalan
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          _userName?.isNotEmpty == true ? _userName!.toUpperCase() : 'DOMPET UTAMA',
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 1.2,
+                          ),
+                        ),
+                        Text(
+                          'PERIODE: ${currentMonthLabel.toUpperCase()}',
+                          style: const TextStyle(
+                            color: Colors.white60,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 0.8,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Cockpit Action Dock Modern (4 Tombol Cepat di Bawah Kartu)
+  Widget _buildModernActionDock() {
+    final todayStr = StorageService.formatDateKey(DateTime.now());
+    final isTodayNoSpend = _noSpendDays.contains(todayStr);
+
+    return Container(
+      margin: const EdgeInsets.only(top: 18),
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          Expanded(
+            child: _buildActionDockItem(
+              icon: Icons.flash_on,
+              label: 'Catat Cepat',
+              color: const Color(0xFF0F766E),
+              bgColor: const Color(0xFF0F766E).withValues(alpha: 0.1),
+              onTap: _showSmartQuickInputModal,
+            ),
+          ),
+          Expanded(
+            child: _buildActionDockItem(
+              icon: Icons.qr_code_scanner,
+              label: 'Pindai Bukti',
+              color: const Color(0xFF0284C7),
+              bgColor: const Color(0xFF0284C7).withValues(alpha: 0.1),
+              onTap: _showImageSourceDialog,
+            ),
+          ),
+          Expanded(
+            child: _buildActionDockItem(
+              icon: isTodayNoSpend ? Icons.verified : Icons.shield_outlined,
+              label: isTodayNoSpend ? 'Terklaim 🛡️' : 'Hari Hemat',
+              color: const Color(0xFF059669),
+              bgColor: const Color(0xFF059669).withValues(alpha: 0.1),
+              onTap: _claimNoSpendToday,
+            ),
+          ),
+          Expanded(
+            child: _buildActionDockItem(
+              icon: Icons.ios_share,
+              label: 'Ekspor Data',
+              color: const Color(0xFF6366F1),
+              bgColor: const Color(0xFF6366F1).withValues(alpha: 0.1),
+              onTap: _showExportDialog,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActionDockItem({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required Color bgColor,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: () {
+        HapticFeedback.lightImpact();
+        onTap();
+      },
+      borderRadius: BorderRadius.circular(18),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 6),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 50,
+              height: 50,
+              decoration: BoxDecoration(
+                color: bgColor,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: color.withValues(alpha: 0.2), width: 1.2),
+              ),
+              alignment: Alignment.center,
+              child: Icon(icon, color: color, size: 22),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+                color: Colors.grey.shade800,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -2311,22 +2948,61 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
-        title: const Text(
-          'CatatDuit',
-          style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: -0.5),
+        backgroundColor: const Color(0xFFF8FAFC),
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        title: Row(
+          children: [
+            CircleAvatar(
+              radius: 18,
+              backgroundColor: const Color(0xFF0F766E).withValues(alpha: 0.12),
+              child: Text(
+                (_userName?.isNotEmpty == true ? _userName![0] : 'C').toUpperCase(),
+                style: const TextStyle(
+                  color: Color(0xFF0F766E),
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Halo, ${_userName?.isNotEmpty == true ? _userName : "Teman Hemat"} 👋',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey.shade600,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const Text(
+                  'CatatDuit',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w900,
+                    fontSize: 18,
+                    letterSpacing: -0.5,
+                    color: Color(0xFF0F172A),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ),
         centerTitle: false,
         actions: [
           IconButton(
-            tooltip: 'Ekspor Laporan Bulanan',
-            icon: const Icon(Icons.ios_share),
-            onPressed: _showExportDialog,
+            tooltip: 'Ganti Tema Kartu',
+            icon: const Icon(Icons.style_outlined, color: Color(0xFF0F766E)),
+            onPressed: _cycleCardSkin,
           ),
           IconButton(
-            tooltip: 'Atur Nama Pemilik',
+            tooltip: 'Atur Profil & Nama',
             icon: Icon(
-              Icons.account_circle,
-              color: _userName != null ? Colors.teal.shade700 : Colors.grey.shade600,
+              Icons.account_circle_outlined,
+              color: _userName != null ? const Color(0xFF0F766E) : Colors.grey.shade600,
             ),
             onPressed: _showProfileDialog,
           ),
@@ -2337,184 +3013,14 @@ class _HomeScreenState extends State<HomeScreen> {
           ListView(
             padding: const EdgeInsets.all(16),
             children: [
-              // Pengatur Bulan (Per Bulan)
-              Container(
-                margin: const EdgeInsets.only(bottom: 16),
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: Colors.grey.shade200),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.chevron_left),
-                      onPressed: _previousMonth,
-                    ),
-                    Row(
-                      children: [
-                        const Icon(Icons.calendar_month, size: 18, color: Color(0xFF0F766E)),
-                        const SizedBox(width: 8),
-                        Text(
-                          currentMonthLabel,
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                        ),
-                      ],
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.chevron_right),
-                      onPressed: _nextMonth,
-                    ),
-                  ],
-                ),
-              ),
+              // Pengatur Bulan Floating Modern
+              _buildMonthSelector(currentMonthLabel),
 
-              // Saldo Card Bulan Ini
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF0F766E), Color(0xFF115E59)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(24),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFF0F766E).withValues(alpha: 0.3),
-                      blurRadius: 16,
-                      offset: const Offset(0, 8),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Sisa Dana ($currentMonthLabel)',
-                      style: const TextStyle(color: Colors.white70, fontSize: 14),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      currencyFormatter.format(_saldoBulanIni),
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 28,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Row(
-                                  children: [
-                                    Icon(Icons.arrow_downward, color: Colors.greenAccent, size: 16),
-                                    SizedBox(width: 4),
-                                    Text('Pemasukan', style: TextStyle(color: Colors.white70, fontSize: 12)),
-                                  ],
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  currencyFormatter.format(_totalPemasukanBulanIni),
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Row(
-                                  children: [
-                                    Icon(Icons.arrow_upward, color: Colors.redAccent, size: 16),
-                                    SizedBox(width: 4),
-                                    Text('Pengeluaran', style: TextStyle(color: Colors.white70, fontSize: 12)),
-                                  ],
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  currencyFormatter.format(_totalPengeluaranBulanIni),
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
+              // Hero Neo-Banking Big Card Interaktif
+              _buildNeoBankHeroCard(currentMonthLabel),
 
-              // Bar Aksi Cepat: Catat Cepat vs Pindai Bukti
-              Container(
-                margin: const EdgeInsets.only(top: 14),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: _showSmartQuickInputModal,
-                        icon: const Icon(Icons.flash_on, color: Colors.white, size: 20),
-                        label: const Text(
-                          'Catat Cepat',
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.white),
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF0F766E),
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                          elevation: 2,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: _showImageSourceDialog,
-                        icon: const Icon(Icons.qr_code_scanner, color: Color(0xFF0F766E), size: 20),
-                        label: const Text(
-                          'Pindai Bukti',
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF0F766E)),
-                        ),
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          side: const BorderSide(color: Color(0xFF0F766E), width: 1.5),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+              // Cockpit Action Dock Modern (4 Tombol Cepat)
+              _buildModernActionDock(),
 
               // Kartu Daily Habit & Streak Gamifikasi
               _buildDailyStreakCard(),

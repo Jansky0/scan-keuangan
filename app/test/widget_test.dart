@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -6,12 +7,19 @@ import 'package:app/services/storage_service.dart';
 
 void main() {
   testWidgets('CatatDuit app smoke test', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 2.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
     SharedPreferences.setMockInitialValues({});
     await tester.pumpWidget(const CatatDuitApp());
     await tester.pumpAndSettle();
 
-    expect(find.text('CatatDuit'), findsOneWidget);
+    expect(find.text('CatatDuit'), findsAtLeastNWidgets(1));
     expect(find.text('Catat Cepat'), findsOneWidget);
+    expect(find.text('SALDO KEUANGAN'), findsOneWidget);
+    expect(find.text('Pindai Bukti'), findsOneWidget);
   });
 
   test('Streak calculation and title unit test', () {
@@ -45,15 +53,20 @@ void main() {
   });
 
   testWidgets('Daily check-in claim No-Spend day test', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 2.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
     SharedPreferences.setMockInitialValues({});
     await tester.pumpWidget(const CatatDuitApp());
     await tester.pumpAndSettle();
 
-    // Pastikan tombol Hari Ini Rp 0 (Hemat) tampil
-    expect(find.text('Hari Ini Rp 0 (Hemat)'), findsOneWidget);
+    // Pastikan tombol Hari Hemat tampil di Action Dock
+    expect(find.text('Hari Hemat'), findsOneWidget);
 
-    // Ketuk 'Hari Ini Rp 0 (Hemat)'
-    await tester.tap(find.text('Hari Ini Rp 0 (Hemat)'));
+    // Ketuk 'Hari Hemat'
+    await tester.tap(find.text('Hari Hemat'));
     await tester.pumpAndSettle();
 
     // Modal perayaan No-Spend Day muncul
@@ -64,8 +77,8 @@ void main() {
     await tester.tap(find.text('Mantap, Pertahankan! 🚀'));
     await tester.pumpAndSettle();
 
-    // Kartu sekarang menampilkan status Terklaim
-    expect(find.text('Terklaim No-Spend Day! 🛡️'), findsOneWidget);
+    // Action dock dan kartu sekarang menampilkan status Terklaim
+    expect(find.text('Terklaim 🛡️'), findsOneWidget);
   });
 }
 

@@ -59,6 +59,33 @@ class StorageService {
     await prefs.setString(_keyUserName, name.trim());
   }
 
+  static const String _keyCardSkinIndex = 'user_card_skin_index';
+  static const String _keyBalanceVisibility = 'user_balance_visibility';
+
+  /// Memuat pilihan tema kartu
+  static Future<int> loadCardSkinIndex() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getInt(_keyCardSkinIndex) ?? 0;
+  }
+
+  /// Menyimpan pilihan tema kartu
+  static Future<void> saveCardSkinIndex(int index) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(_keyCardSkinIndex, index);
+  }
+
+  /// Memuat preferensi privasi sensor saldo
+  static Future<bool> loadBalanceVisibility() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_keyBalanceVisibility) ?? true;
+  }
+
+  /// Menyimpan preferensi privasi sensor saldo
+  static Future<void> saveBalanceVisibility(bool isVisible) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_keyBalanceVisibility, isVisible);
+  }
+
   static const String _keyNoSpendDays = 'user_no_spend_days';
 
   /// Memuat daftar tanggal yang diklaim sebagai 'Hari Hemat Rp 0'
