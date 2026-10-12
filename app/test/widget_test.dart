@@ -80,5 +80,43 @@ void main() {
     // Action dock dan kartu sekarang menampilkan status Terklaim
     expect(find.text('Terklaim 🛡️'), findsOneWidget);
   });
+
+  testWidgets('Bottom Navigation Bar switching test', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 2.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    SharedPreferences.setMockInitialValues({});
+    await tester.pumpWidget(const CatatDuitApp());
+    await tester.pumpAndSettle();
+
+    // Pastikan Navbar tampil
+    expect(find.text('Beranda'), findsOneWidget);
+    expect(find.text('Analisis'), findsOneWidget);
+    expect(find.text('Pengaturan'), findsOneWidget);
+
+    // Pindah ke Tab Analisis
+    await tester.tap(find.text('Analisis'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Kesehatan Finansial'), findsOneWidget);
+    expect(find.text('Perbandingan Arus Kas'), findsOneWidget);
+    expect(find.text('Pola Belanja Harian'), findsOneWidget);
+
+    // Pindah ke Tab Pengaturan
+    await tester.tap(find.text('Pengaturan'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Pilihan Tema Visual Neo-Banking'), findsOneWidget);
+    expect(find.text('Pengelolaan & Ekspor Data'), findsOneWidget);
+
+    // Kembali ke Tab Beranda
+    await tester.tap(find.text('Beranda'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('SALDO KEUANGAN'), findsOneWidget);
+  });
 }
+
 
