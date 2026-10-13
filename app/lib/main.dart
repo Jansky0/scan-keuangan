@@ -2903,21 +2903,24 @@ class _HomeScreenState extends State<HomeScreen> {
         title: Row(
           children: [
             Container(
-              padding: const EdgeInsets.all(2),
+              width: 36,
+              height: 36,
               decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(color: accent, width: 1.5),
-              ),
-              child: CircleAvatar(
-                radius: 16,
-                backgroundColor: accent.withValues(alpha: 0.15),
-                child: Text(
-                  (_userName?.isNotEmpty == true ? _userName![0] : 'C').toUpperCase(),
-                  style: TextStyle(
-                    color: accent,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 13,
+                borderRadius: BorderRadius.circular(11),
+                border: Border.all(color: accent.withValues(alpha: 0.4), width: 1.2),
+                boxShadow: [
+                  BoxShadow(
+                    color: accent.withValues(alpha: 0.2),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
                   ),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(9.5),
+                child: Image.asset(
+                  'assets/images/logo.png',
+                  fit: BoxFit.cover,
                 ),
               ),
             ),
@@ -3951,11 +3954,40 @@ class _HomeScreenState extends State<HomeScreen> {
                 'CatatDuit bekerja 100% secara offline dan on-device. Data transaksi, screenshot m-banking, dan OCR Anda tidak pernah dikirim ke internet ataupun server pihak ketiga mana pun.',
                 style: TextStyle(fontSize: 12, color: Colors.white70, height: 1.4),
               ),
-              const SizedBox(height: 16),
-              const Center(
-                child: Text(
-                  'CatatDuit Neo v1.4.0 • On-Device Financial Intelligence',
-                  style: TextStyle(fontSize: 11, color: Colors.white38),
+              const SizedBox(height: 20),
+              Center(
+                child: Column(
+                  children: [
+                    Container(
+                      width: 58,
+                      height: 58,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: accent.withValues(alpha: 0.5), width: 1.5),
+                        boxShadow: [
+                          BoxShadow(
+                            color: accent.withValues(alpha: 0.2),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(14.5),
+                        child: Image.asset('assets/images/logo.png', fit: BoxFit.cover),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    const Text(
+                      'CatatDuit Neo v1.4.1',
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white),
+                    ),
+                    const SizedBox(height: 2),
+                    const Text(
+                      'On-Device Financial Intelligence',
+                      style: TextStyle(fontSize: 11, color: Colors.white38),
+                    ),
+                  ],
                 ),
               ),
             ],
